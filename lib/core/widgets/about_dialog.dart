@@ -16,14 +16,15 @@ class _AboutDialog extends StatelessWidget {
   const _AboutDialog();
 
   // TODO: confirm with developer — name / handle / link to show as credit.
-  static const _developer = 'Sahil';
-  static const _developerLink = ''; // e.g. https://github.com/...
+  static const _developer = 'Abdul Sahil';
+  static const _repo = 'https://github.com/abdulsaheel/tgsrtc-bus-live-tracking';
+  static const _releases = '$_repo/releases/latest';
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AlertDialog(
-      title: const Text('Gamyam'),
+      title: const Text('TGSRTC Bus Live Tracking'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -54,21 +55,33 @@ class _AboutDialog extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          InkWell(
-            onTap: _developerLink.isEmpty
-                ? null
-                : () => launchUrl(Uri.parse(_developerLink),
-                    mode: LaunchMode.externalApplication),
-            child: Row(
-              children: [
-                const Icon(Icons.code, size: 18),
-                const SizedBox(width: 8),
-                Text('Built by $_developer',
-                    style: theme.textTheme.bodyMedium),
-              ],
-            ),
+          Row(
+            children: [
+              const Icon(Icons.code, size: 18),
+              const SizedBox(width: 8),
+              Text('Built by $_developer',
+                  style: theme.textTheme.bodyMedium),
+            ],
           ),
           const SizedBox(height: 12),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.system_update_alt),
+            title: const Text('Get the latest version'),
+            subtitle: const Text('Download the newest APK from GitHub Releases'),
+            trailing: const Icon(Icons.open_in_new, size: 18),
+            onTap: () => launchUrl(Uri.parse(_releases),
+                mode: LaunchMode.externalApplication),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.code_outlined),
+            title: const Text('Source code'),
+            subtitle: const Text('github.com/abdulsaheel/tgsrtc-bus-live-tracking'),
+            trailing: const Icon(Icons.open_in_new, size: 18),
+            onTap: () => launchUrl(Uri.parse(_repo),
+                mode: LaunchMode.externalApplication),
+          ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.confirmation_number_outlined),

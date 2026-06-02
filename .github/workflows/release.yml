@@ -1,0 +1,51 @@
+name: Build & Release APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.41.6'
+          cache: true
+
+      # The release app talks ONLY to the Cloudflare proxy, so no Mappls keys
+      # are baked into the APK. .env is required because it's a bundled asset.
+      - name: Create .env (proxy mode)
+        run: |
+          cat > .env <<EOF
+          USE_PROXY=true
+          PROXY_BASE_URL=${{ secrets.PROXY_BASE_URL }}
+          MAPPLS_CLIENT_ID=unused
+          MAPPLS_CLIENT_SECRET=unused
+          EOF
+
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter build apk --release
+
+      - name: Read app version
+        id: ver
+        run: echo "version=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | tr '+' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Rename APK
+        run: mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/tgsrtc-bus-live-tracking-v${{ steps.ver.outputs.version }}.apk"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}+build${{ github.run_number }}
+          name: v${{ steps.ver.outputs.version }} (build ${{ github.run_number }})
+          generate_release_notes: true
+          files: build/app/outputs/flutter-apk/tgsrtc-bus-live-tracking-v${{ steps.ver.outputs.version }}.apk
