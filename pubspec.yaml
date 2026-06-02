@@ -1,0 +1,42 @@
+name: gamyam
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  dio: ^5.9.2
+  flutter:
+    sdk: flutter
+  flutter_dotenv: ^6.0.1
+  flutter_foreground_task: ^9.2.2
+  flutter_local_notifications: ^18.0.1
+  flutter_map: ^8.3.0
+  flutter_riverpod: ^3.3.1
+  flutter_svg: ^2.3.0
+  freezed_annotation: ^3.1.0
+  geolocator: ^14.0.2
+  go_router: ^17.2.3
+  google_fonts: ^8.1.0
+  intl: ^0.20.2
+  json_annotation: ^4.12.0
+  latlong2: ^0.9.1
+  live_activities: ^2.4.9
+  shared_preferences: ^2.5.5
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.15.0
+  freezed: ^3.2.5
+  json_serializable: ^6.14.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/
