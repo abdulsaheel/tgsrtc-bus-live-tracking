@@ -37,10 +37,14 @@ jobs:
 
       - name: Read app version
         id: ver
-        run: echo "version=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | tr '+' '-')" >> "$GITHUB_OUTPUT"
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | cut -d' ' -f2 | tr '+' '-')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Rename APK
-        run: mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/tgsrtc-bus-live-tracking-v${{ steps.ver.outputs.version }}.apk"
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk \
+            "build/app/outputs/flutter-apk/tgsrtc-bus-live-tracking-v${{ steps.ver.outputs.version }}.apk"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
