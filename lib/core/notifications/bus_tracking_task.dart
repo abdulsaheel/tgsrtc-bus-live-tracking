@@ -50,10 +50,30 @@ class BusTrackingTaskHandler extends TaskHandler {
 
   Future<void> _ensureApi(SharedPreferences prefs) async {
     final dataBase = prefs.getString('cfg_data_base');
+    final useProxy = prefs.getBool('cfg_use_proxy') ?? false;
+
+    if (dataBase == null) return;
+
+    // Proxy mode: the Cloudflare Worker injects auth server-side, so the
+    // isolate just hits the data base directly — no OAuth, no client creds.
+    // (Minting a token against the proxy fails, which previously left _api
+    // null forever and the notification stuck on "Starting live tracking…".)
+    if (useProxy) {
+      if (_api != null) return;
+      final dio = Dio(BaseOptions(
+        baseUrl: dataBase,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 25),
+      ));
+      _api = TgsrtcApi(dio);
+      _tokenAt = DateTime.now();
+      return;
+    }
+
     final authBase = prefs.getString('cfg_auth_base');
     final id = prefs.getString('cfg_client_id');
     final secret = prefs.getString('cfg_client_secret');
-    if (dataBase == null || authBase == null || id == null || secret == null) {
+    if (authBase == null || id == null || secret == null) {
       return;
     }
     // Refresh token roughly hourly.
@@ -162,6 +182,11 @@ class BusTrackingTaskHandler extends TaskHandler {
       'prevStop': prevName,
       'progress': progress,
       'nextId': nextId,
+      'stopsLeft': stopsLeft ?? -1,
+      'heading': data.heading,
+      // Full raw snapshot so the live screen can share THIS poll instead of
+      // running a second one for the same vehicle.
+      'live': data.toJson(),
     });
   }
 
@@ -224,6 +249,15 @@ class BusTrackingTaskHandler extends TaskHandler {
 
   @override
   void onNotificationPressed() {
-    FlutterForegroundTask.launchApp('/track');
+    // Tapping the notification opens the SAME full live screen the pill /
+    // Live Activity point to (the followed bus), not just the home tab.
+    final vid = _vehicleId;
+    if (vid == null) {
+      FlutterForegroundTask.launchApp('/track');
+      return;
+    }
+    final q = <String>['title=${Uri.encodeComponent(_title)}'];
+    if (_tripId != null && _tripId! > 0) q.add('tripId=$_tripId');
+    FlutterForegroundTask.launchApp('/live/$vid?${q.join('&')}');
   }
 }

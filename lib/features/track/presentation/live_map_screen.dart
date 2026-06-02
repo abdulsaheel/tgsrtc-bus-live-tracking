@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:floating/floating.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -33,7 +35,31 @@ class LiveMapScreen extends ConsumerStatefulWidget {
 
 class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
   final _map = MapController();
+  final _pipMap = MapController();
+  final _floating = Floating();
   LatLng? _lastBus;
+
+  @override
+  void initState() {
+    super.initState();
+    if (Platform.isAndroid) _setupAutoPip();
+  }
+
+  /// Auto-enter PiP on Home gesture — only on Android 12+ (API 31). Older
+  /// versions (e.g. API 30) don't support auto-enter and throw; there we rely
+  /// on the manual minimize button below. Caught so it never crashes.
+  Future<void> _setupAutoPip() async {
+    try {
+      await _floating.enable(const OnLeavePiP(aspectRatio: Rational(3, 4)));
+    } catch (_) {/* auto-PiP unsupported on this OS version */}
+  }
+
+  /// Manual minimize → enter PiP now. Works on API 26+.
+  Future<void> _enterPip() async {
+    try {
+      await _floating.enable(const ImmediatePiP(aspectRatio: Rational(3, 4)));
+    } catch (_) {/* PiP unavailable / disabled in system settings */}
+  }
 
   /// Default zoom — close enough that locality / chowk / road labels show.
   static const _followZoom = 16.0;
@@ -47,19 +73,21 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
     if (p == null) return;
     setState(() => _following = true);
     // Re-center and turn the map toward the bus's direction of travel.
-    final heading = ref.read(liveVehicleProvider(widget.vehicleId)).asData?.value.heading ?? 0;
+    final heading = ref.read(sharedLiveProvider(widget.vehicleId)).asData?.value.heading ?? 0;
     _map.moveAndRotate(p, _followZoom, -heading);
   }
 
   @override
   void dispose() {
+    if (Platform.isAndroid) _floating.cancelOnLeavePiP();
     _map.dispose();
+    _pipMap.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final live = ref.watch(liveVehicleProvider(widget.vehicleId));
+    final live = ref.watch(sharedLiveProvider(widget.vehicleId));
     
     // Use the tripId from live data if available (the ground truth), 
     // otherwise fall back to the one passed in (the search result).
@@ -93,7 +121,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
 
     final tripData = trip?.asData?.value;
 
-    return Scaffold(
+    final fullView = Scaffold(
       body: Stack(
         children: [
           _Map(
@@ -113,13 +141,25 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
               if (_following) setState(() => _following = false);
             },
           ),
-          // Back button overlay.
+          // Back button overlay (+ minimize-to-PiP on Android).
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(8),
-              child: _CircleButton(
-                icon: Icons.arrow_back,
-                onTap: () => Navigator.of(context).maybePop(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _CircleButton(
+                    icon: Icons.arrow_back,
+                    onTap: () => Navigator.of(context).maybePop(),
+                  ),
+                  if (Platform.isAndroid) ...[
+                    const SizedBox(width: 8),
+                    _CircleButton(
+                      icon: Icons.picture_in_picture_alt,
+                      onTap: _enterPip,
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -149,6 +189,33 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
             _DetailsPanel(title: widget.title, data: data, trip: tripData),
         ],
       ),
+    );
+
+    // On Android, render a stripped-down map-only view while in the OS
+    // picture-in-picture window; the full screen otherwise.
+    if (!Platform.isAndroid) return fullView;
+
+    // Next-stop name for the PiP ribbon (from the trip's stop list).
+    String? nextStopName;
+    final np = data?.nextPointId;
+    if (tripData != null && np != null && np > 0) {
+      for (final p in tripData.points) {
+        if (p.id == np) {
+          nextStopName = p.name;
+          break;
+        }
+      }
+    }
+
+    return PiPSwitcher(
+      childWhenEnabled: _PipView(
+        controller: _pipMap,
+        busPoint: busPoint,
+        heading: data?.heading ?? 0,
+        data: data,
+        nextStop: nextStopName,
+      ),
+      childWhenDisabled: fullView,
     );
   }
 
@@ -381,6 +448,109 @@ class _ErrorOverlay extends StatelessWidget {
   return (AppColors.statusIdle, d.statusStr ?? 'Idle', Icons.pause_circle_outline);
 }
 
+/// Stripped-down map-only view rendered inside the Android OS picture-in-
+/// picture window (no app bar, panels, or buttons — those don't fit a tiny
+/// floating window). Just the live map + a bottom status ribbon.
+class _PipView extends StatelessWidget {
+  const _PipView({
+    required this.controller,
+    required this.busPoint,
+    required this.heading,
+    required this.data,
+    required this.nextStop,
+  });
+
+  final MapController controller;
+  final LatLng? busPoint;
+  final double heading;
+  final LiveData? data;
+  final String? nextStop;
+
+  @override
+  Widget build(BuildContext context) {
+    if (busPoint == null) {
+      return const ColoredBox(
+        color: Color(0xFF0E1216),
+        child: Center(
+          child: Text('Locating bus…', style: TextStyle(color: Colors.white)),
+        ),
+      );
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        controller.move(busPoint!, 16);
+      } catch (_) {/* not ready */}
+    });
+    final (color, _, _) = data != null
+        ? _busStatus(data!)
+        : (AppColors.statusRunning, 'Live', Icons.directions_bus);
+    return ColoredBox(
+      color: const Color(0xFF0E1216),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          FlutterMap(
+            mapController: controller,
+            options: MapOptions(
+              initialCenter: busPoint!,
+              initialZoom: 16,
+              interactionOptions:
+                  const InteractionOptions(flags: InteractiveFlag.none),
+            ),
+            children: [
+              buildBaseTileLayer(context),
+              MarkerLayer(markers: [
+                Marker(
+                  point: busPoint!,
+                  width: 40,
+                  height: 40,
+                  child: _BusMarker(heading: heading, stale: false),
+                ),
+              ]),
+            ],
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Color(0xF20E1216)],
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                      width: 10,
+                      height: 10,
+                      decoration:
+                          BoxDecoration(color: color, shape: BoxShape.circle)),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      nextStop?.isNotEmpty == true ? nextStop! : 'Tracking…',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Draggable slide-up panel with live stats + driver info.
 class _DetailsPanel extends ConsumerWidget {
   const _DetailsPanel({required this.title, required this.data, this.trip});
@@ -394,12 +564,42 @@ class _DetailsPanel extends ConsumerWidget {
     return trip?.id;
   }
 
+  /// If another bus is already being tracked, confirm the switch (only one bus
+  /// can be tracked at a time). Returns true if it's OK to proceed.
+  Future<bool> _confirmSwitch(BuildContext context, WidgetRef ref) async {
+    final journey = ref.read(journeyControllerProvider);
+    if (!journey.isFollowing || journey.vehicleId == data.id) return true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Already tracking a bus'),
+        content: Text(
+          'You\'re currently tracking ${journey.title ?? 'another bus'}. '
+          'Only one bus can be tracked at a time.\n\n'
+          'Stop that and track this one instead?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep current'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Switch'),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
   Future<void> _toggleFollow(BuildContext context, WidgetRef ref) async {
     final journey = ref.read(journeyControllerProvider);
     if (journey.vehicleId == data.id) {
       await ref.read(journeyControllerProvider.notifier).stopFollowing();
       return;
     }
+    if (!await _confirmSwitch(context, ref)) return;
     await ref.read(journeyControllerProvider.notifier).startFollowing(
           vehicleId: data.id,
           tripId: _activeTripId,
@@ -422,6 +622,10 @@ class _DetailsPanel extends ConsumerWidget {
       );
       return;
     }
+
+    // Setting an alarm on a different bus would switch tracking — confirm first.
+    if (!following && !await _confirmSwitch(context, ref)) return;
+    if (!context.mounted) return;
 
     // Offer upcoming stops (from the API's next stop, else nearest onward).
     final allStops = trip!.points;
@@ -611,7 +815,7 @@ class _AlarmButton extends StatelessWidget {
         ? AppColors.accent
         : isSet
             ? AppColors.primary
-            : Theme.of(context).colorScheme.outline;
+            : Theme.of(context).colorScheme.onSurfaceVariant;
 
     return IconButton.filledTonal(
       onPressed: onTap,
@@ -637,8 +841,9 @@ class _FollowButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color =
-        isFollowing ? theme.colorScheme.primary : theme.colorScheme.outline;
+    final color = isFollowing
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
 
     return IconButton.filledTonal(
       onPressed: onTap,
@@ -646,7 +851,7 @@ class _FollowButton extends StatelessWidget {
         foregroundColor: color,
         backgroundColor: color.withValues(alpha: 0.12),
       ),
-      icon: Icon(isFollowing ? Icons.bookmark : Icons.bookmark_border),
+      icon: Icon(isFollowing ? Icons.push_pin : Icons.push_pin_outlined),
       tooltip: isFollowing ? 'Following Bus' : 'Follow this Bus',
     );
   }
@@ -734,7 +939,7 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: theme.colorScheme.outline),
+          Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 12),
           SizedBox(
               width: 64,

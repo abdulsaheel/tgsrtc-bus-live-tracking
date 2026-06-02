@@ -11,6 +11,7 @@ import '../../../data/models/service_category.dart';
 import '../../../data/models/trip_detail.dart';
 import '../../../data/repositories/location_service.dart';
 import '../../../data/repositories/transit_repository.dart';
+import 'journey_controller.dart';
 
 /// All cities (cached in repo).
 final citiesProvider = FutureProvider<List<City>>(
@@ -89,23 +90,49 @@ final cityRoutesProvider = FutureProvider.autoDispose<List<BusService>>((ref) {
   );
 });
 
-/// Search buses by route number within the selected city + category.
-/// The category supplies the correct operationType/isAirport — without it,
-/// District routes return empty under the default operationType=1.
+/// Live buses for a tapped service.
+/// - City/Airport: the `/trips/routeNumber` endpoint filters server-side by
+///   routeNumber + cityId (operationType=2).
+/// - District: those services have NO routeNumber, and the endpoint can't
+///   filter intercity services — operationType=2 returns 400 ("please enter
+///   cityId") and operationType=1 ignores the filter, returning ALL live
+///   intercity trips. So we fetch the statewide op=1 list and match
+///   client-side by serviceName (== the district service's `name`).
 final routeSearchProvider = FutureProvider.autoDispose
-    .family<List<BusTrip>, String>((ref, routeNumber) async {
+    .family<List<BusTrip>, String>((ref, query) async {
   final city = ref.watch(selectedCityProvider);
   final cat = ref.watch(selectedCategoryProvider);
+  final api = ref.watch(transitRepositoryProvider).api;
 
-  if (routeNumber.trim().isEmpty) return const [];
-  if (cat.cityScoped && city == null) return const [];
+  final q = query.trim();
+  if (q.isEmpty) return const [];
 
-  return ref.watch(transitRepositoryProvider).api.searchByRoute(
-        routeNumber: routeNumber.trim(),
-        cityId: cat.cityScoped ? city?.id : null,
+  if (!cat.cityScoped) {
+    // District / statewide: fetch all live intercity trips, filter by name.
+    final all = await api.searchByRoute(routeNumber: q, operationType: 1);
+    return all.where((t) => t.serviceName == q).toList();
+  }
+
+  if (city == null) return const [];
+  return api.searchByRoute(
+        routeNumber: q,
+        cityId: city.id,
         operationType: cat.operationType,
         isAirport: cat.isAirport,
       );
+});
+
+/// Single live-data source shared by the live screen, the PiP, and the iOS
+/// Live Activity. If [vehicleId] is the bus currently being FOLLOWED, the
+/// foreground-service isolate is already polling it — reuse that snapshot
+/// (zero extra network). Otherwise (just browsing a bus) run our own poll.
+final sharedLiveProvider =
+    Provider.autoDispose.family<AsyncValue<LiveData>, int>((ref, vehicleId) {
+  final j = ref.watch(journeyControllerProvider);
+  if (j.vehicleId == vehicleId && j.live != null) {
+    return AsyncData(j.live!);
+  }
+  return ref.watch(liveVehicleProvider(vehicleId));
 });
 
 /// Full trip detail (stops + road polyline) for drawing the route on the map.

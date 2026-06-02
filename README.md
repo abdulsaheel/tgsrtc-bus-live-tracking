@@ -6,6 +6,14 @@ built with Flutter.
 > ⚠️ **Unofficial & not affiliated** with TGSRTC. Bus data comes from public
 > tracking feeds and may be inaccurate or delayed. Not for emergency use.
 
+## Screenshots
+
+| | | |
+|:---:|:---:|:---:|
+| <img src="screenshots/screenshot-1.png" width="240"><br>**iOS Live Activity** — track from your lock screen & Dynamic Island | <img src="screenshots/screenshot-2.png" width="240"><br>**Live map** — route, stops & a bus that stays in view | <img src="screenshots/screenshot-3.png" width="240"><br>**Live details** — speed, heading, driver & helpline |
+| <img src="screenshots/screenshot-4.png" width="240"><br>**Pick your city** — City / District / Airport, auto-detect | <img src="screenshots/screenshot-5.png" width="240"><br>**Browse routes** — search any route or service | <img src="screenshots/screenshot-6.png" width="240"><br>**Honest & open** — unofficial, free, open source |
+| <img src="screenshots/screenshot-7.png" width="240"><br>**Plan a trip** — buses between two stops (+ transfers) | <img src="screenshots/screenshot-8.png" width="240"><br>**Nearby stops** — find stops & buses around you | |
+
 ## Features
 - Live bus location on a map (route polyline, stop markers, heading-rotated bus).
 - Find buses by **route number** or **between two stops** (City / District / Airport).

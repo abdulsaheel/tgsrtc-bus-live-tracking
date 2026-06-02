@@ -34,6 +34,20 @@ Future<void> main() async {
   await LiveActivityService.init(); // iOS Live Activities (no-op on Android)
 
   final prefs = await SharedPreferences.getInstance();
+
+  // Tapping the Live Activity / Dynamic Island opens the followed bus's live
+  // screen — the same screen the pill and notification point to.
+  LiveActivityService.taps().listen((_) {
+    final vid = prefs.getInt('follow_vehicle_id');
+    if (vid == null) return;
+    final tid = prefs.getInt('follow_trip_id');
+    appRouter.pushNamed('live', pathParameters: {
+      'vehicleId': '$vid',
+    }, queryParameters: {
+      'title': prefs.getString('follow_route_title') ?? 'Live bus',
+      if (tid != null && tid > 0) 'tripId': '$tid',
+    });
+  });
   runApp(
     ProviderScope(
       overrides: [sharedPrefsProvider.overrideWithValue(prefs)],

@@ -24,6 +24,7 @@ class AppPrefs {
   static const _kCfgDataBase = 'cfg_data_base';
   static const _kCfgClientId = 'cfg_client_id';
   static const _kCfgClientSecret = 'cfg_client_secret';
+  static const _kCfgUseProxy = 'cfg_use_proxy';
 
   String? get cityId => _prefs.getString(_kCityId);
   String? get cityName => _prefs.getString(_kCityName);
@@ -38,6 +39,7 @@ class AppPrefs {
   String? get cfgDataBase => _prefs.getString(_kCfgDataBase);
   String? get cfgClientId => _prefs.getString(_kCfgClientId);
   String? get cfgClientSecret => _prefs.getString(_kCfgClientSecret);
+  bool get cfgUseProxy => _prefs.getBool(_kCfgUseProxy) ?? false;
 
   /// Mirror networking config for the background isolate.
   Future<void> setTrackingConfig({
@@ -45,11 +47,13 @@ class AppPrefs {
     required String dataBase,
     required String clientId,
     required String clientSecret,
+    required bool useProxy,
   }) async {
     await _prefs.setString(_kCfgAuthBase, authBase);
     await _prefs.setString(_kCfgDataBase, dataBase);
     await _prefs.setString(_kCfgClientId, clientId);
     await _prefs.setString(_kCfgClientSecret, clientSecret);
+    await _prefs.setBool(_kCfgUseProxy, useProxy);
   }
 
   Future<void> setFollowTargetStop(int? stopId) async {
