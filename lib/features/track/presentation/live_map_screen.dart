@@ -226,7 +226,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
   }
 }
 
-class _Map extends StatelessWidget {
+class _Map extends StatefulWidget {
   const _Map({
     required this.controller,
     required this.initialCenter,
@@ -247,9 +247,56 @@ class _Map extends StatelessWidget {
   final TripDetail? trip;
   final VoidCallback onUserGesture;
 
+  @override
+  State<_Map> createState() => _MapState();
+}
+
+class _MapState extends State<_Map> with SingleTickerProviderStateMixin {
+  // Glides the bus marker smoothly from its previous fix to the new one each
+  // poll, instead of teleporting — the "live animated journey".
+  late final AnimationController _glide = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..addListener(() => setState(() {}));
+  LatLng? _from;
+  LatLng? _to;
+
+  @override
+  void initState() {
+    super.initState();
+    _to = widget.busPoint;
+  }
+
+  @override
+  void didUpdateWidget(covariant _Map old) {
+    super.didUpdateWidget(old);
+    final p = widget.busPoint;
+    if (p != null && p != _to) {
+      _from = _displayBus ?? old.busPoint ?? p;
+      _to = p;
+      _glide.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _glide.dispose();
+    super.dispose();
+  }
+
+  static LatLng _lerp(LatLng a, LatLng b, double t) => LatLng(
+        a.latitude + (b.latitude - a.latitude) * t,
+        a.longitude + (b.longitude - a.longitude) * t,
+      );
+
+  /// Current (interpolated) bus position to render.
+  LatLng? get _displayBus => (_from != null && _to != null)
+      ? _lerp(_from!, _to!, _glide.value)
+      : widget.busPoint;
+
   /// Splits the route at the bus's position: the part already travelled is
   /// muted/grey, the part ahead is the live colour (Google-Maps convention).
-  List<Widget> _routeLayers(List<LatLng> route) {
+  List<Widget> _routeLayers(List<LatLng> route, LatLng? busPoint) {
     if (busPoint == null) {
       return [
         PolylineLayer(polylines: [
@@ -262,7 +309,7 @@ class _Map extends StatelessWidget {
     var idx = 0;
     var best = double.infinity;
     for (var i = 0; i < route.length; i++) {
-      final d = dist(route[i], busPoint!);
+      final d = dist(route[i], busPoint);
       if (d < best) {
         best = d;
         idx = i;
@@ -290,50 +337,49 @@ class _Map extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trip = widget.trip;
+    final bus = _displayBus;
     final route = [
       for (final p in trip?.polylinePoints ?? const [])
         LatLng(p.lat, p.lng),
     ];
-    final stops = [
-      for (final s in trip?.points ?? const [])
-        if (s.latitude != null && s.longitude != null)
-          LatLng(s.latitude!, s.longitude!),
-    ];
 
     return FlutterMap(
-      mapController: controller,
+      mapController: widget.controller,
       options: MapOptions(
-        initialCenter: initialCenter,
-        initialZoom: initialZoom,
+        initialCenter: widget.initialCenter,
+        initialZoom: widget.initialZoom,
         minZoom: 4,
         maxZoom: 19,
         onPositionChanged: (camera, hasGesture) {
-          if (hasGesture) onUserGesture();
+          if (hasGesture) widget.onUserGesture();
         },
       ),
       children: [
         buildBaseTileLayer(context),
-        if (route.length >= 2) ..._routeLayers(route),
-        if (stops.isNotEmpty)
-          MarkerLayer(
-            markers: [
-              for (final s in stops)
+        // Split at the SETTLED position (not the per-frame glide) so the O(n)
+        // nearest-vertex scan doesn't run 60fps during the animation.
+        if (route.length >= 2) ..._routeLayers(route, widget.busPoint),
+        MarkerLayer(
+          markers: [
+            for (final p in trip?.points ?? const [])
+              if (p.latitude != null && p.longitude != null)
                 Marker(
-                  point: s,
-                  width: 12,
-                  height: 12,
-                  child: const _StopDot(),
+                  point: LatLng(p.latitude!, p.longitude!),
+                  width: 14,
+                  height: 14,
+                  child: _StopDot(passed: p.isPassed),
                 ),
-            ],
-          ),
-        if (busPoint != null)
+          ],
+        ),
+        if (bus != null)
           MarkerLayer(
             markers: [
               Marker(
-                point: busPoint!,
-                width: 46,
-                height: 46,
-                child: _BusMarker(heading: heading, stale: stale),
+                point: bus,
+                width: 64,
+                height: 64,
+                child: _BusMarker(heading: widget.heading, stale: widget.stale),
               ),
             ],
           ),
@@ -344,17 +390,25 @@ class _Map extends StatelessWidget {
 }
 
 class _StopDot extends StatelessWidget {
-  const _StopDot();
+  const _StopDot({required this.passed});
+  final bool passed;
   @override
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          // Passed stops are "done" — muted grey; upcoming stay accent-ringed.
+          color: passed ? AppColors.statusNoData : Colors.white,
           shape: BoxShape.circle,
-          border: Border.all(color: AppColors.secondary, width: 2.5),
+          border: Border.all(
+            color: passed ? AppColors.statusNoData : AppColors.secondary,
+            width: 2.5,
+          ),
         ),
       );
 }
 
+/// Top-down bus glyph (assets/icon/bus-top.png) whose nose points LEFT; we
+/// rotate it to the travel heading. heading is compass degrees (0 = north);
+/// the image's forward = west (270°), so screen rotation = heading + 90°.
 class _BusMarker extends StatelessWidget {
   const _BusMarker({required this.heading, required this.stale});
   final double heading;
@@ -362,16 +416,16 @@ class _BusMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = stale ? AppColors.statusNoData : AppColors.primary;
-    return Container(
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 3),
-      ),
-      child: Transform.rotate(
-        angle: heading * math.pi / 180,
-        child: const Icon(Icons.navigation, color: Colors.white, size: 22),
+    return Transform.rotate(
+      angle: (heading + 90) * math.pi / 180,
+      child: Opacity(
+        opacity: stale ? 0.5 : 1.0,
+        child: Image.asset(
+          'assets/icon/bus-top.png',
+          width: 58,
+          height: 58,
+          filterQuality: FilterQuality.medium,
+        ),
       ),
     );
   }
@@ -690,6 +744,8 @@ class _DetailsPanel extends ConsumerWidget {
     final ago = ts == null ? '—' : '${DateTime.now().difference(ts).inSeconds}s ago';
     final freshness = stale ? '$ago · GPS delayed' : 'Updated $ago';
 
+    final stops = trip?.points ?? const [];
+
     return DraggableScrollableSheet(
       initialChildSize: 0.32,
       minChildSize: 0.16,
@@ -790,10 +846,102 @@ class _DetailsPanel extends ConsumerWidget {
                     icon: Icons.support_agent_outlined,
                     label: 'Helpline',
                     value: trip!.helpline!),
+              if (stops.isNotEmpty) ...[
+                const Divider(height: 28),
+                Row(children: [
+                  const Icon(Icons.route_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Stops', style: theme.textTheme.titleMedium),
+                  const Spacer(),
+                  Text('${stops.length}', style: theme.textTheme.bodyMedium),
+                ]),
+                const SizedBox(height: 8),
+                for (final p in stops) _StopRow(point: p),
+              ],
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// One stop in the live journey timeline. Shows the SCHEDULED time and, for
+/// stops the bus has already passed today, the ACTUAL arrival (entryTime from
+/// the live trip detail) — or an ETA for upcoming stops when forecast exists.
+class _StopRow extends StatelessWidget {
+  const _StopRow({required this.point});
+  final TripPoint point;
+
+  static String _hhmm(int? epochSecs) {
+    if (epochSecs == null || epochSecs == 0) return '';
+    final d = DateTime.fromMillisecondsSinceEpoch(epochSecs * 1000);
+    return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final passed = point.isPassed;
+    final scheduled = _hhmm(point.plannedTime);
+    final actual = _hhmm(point.entryTime); // today's actual arrival, if passed
+    final eta = passed ? '' : _hhmm(point.eta); // forecast for upcoming
+    final muted = theme.colorScheme.onSurfaceVariant;
+
+    // Early/late delta vs schedule, when both known.
+    String? delta;
+    if (passed && (point.entryTime ?? 0) > 0 && (point.plannedTime ?? 0) > 0) {
+      final m = ((point.entryTime! - point.plannedTime!) / 60).round();
+      if (m.abs() >= 1) delta = m > 0 ? '$m min late' : '${-m} min early';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            passed ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 18,
+            color: passed ? AppColors.statusRunning : muted,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(point.name,
+                    style: theme.textTheme.bodyLarge
+                        ?.copyWith(color: passed ? muted : null),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                if (delta != null)
+                  Text(delta,
+                      style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (actual.isNotEmpty)
+                Text('arrived $actual',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.statusRunning,
+                        fontWeight: FontWeight.w600))
+              else if (eta.isNotEmpty)
+                Text('ETA $eta',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w600)),
+              if (scheduled.isNotEmpty)
+                Text('sch $scheduled',
+                    style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

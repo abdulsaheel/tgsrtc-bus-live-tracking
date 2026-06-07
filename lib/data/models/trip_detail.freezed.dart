@@ -559,7 +559,7 @@ as String?,
 /// @nodoc
 mixin _$TripPoint {
 
- int get id; String get name; int get sequence; int? get eta; int? get etd; int? get plannedTime; int? get plannedExitTime;@JsonKey(name: 'myRoute') bool get onRoute; PointGeometry? get geometry;
+ int get id; String get name; int get sequence; int? get eta; int? get etd; int? get plannedTime; int? get plannedExitTime; int? get entryTime; int? get exitTime;@JsonKey(name: 'myRoute') bool get onRoute; PointGeometry? get geometry;
 /// Create a copy of TripPoint
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -572,16 +572,16 @@ $TripPointCopyWith<TripPoint> get copyWith => _$TripPointCopyWithImpl<TripPoint>
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is TripPoint&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.sequence, sequence) || other.sequence == sequence)&&(identical(other.eta, eta) || other.eta == eta)&&(identical(other.etd, etd) || other.etd == etd)&&(identical(other.plannedTime, plannedTime) || other.plannedTime == plannedTime)&&(identical(other.plannedExitTime, plannedExitTime) || other.plannedExitTime == plannedExitTime)&&(identical(other.onRoute, onRoute) || other.onRoute == onRoute)&&(identical(other.geometry, geometry) || other.geometry == geometry));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TripPoint&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.sequence, sequence) || other.sequence == sequence)&&(identical(other.eta, eta) || other.eta == eta)&&(identical(other.etd, etd) || other.etd == etd)&&(identical(other.plannedTime, plannedTime) || other.plannedTime == plannedTime)&&(identical(other.plannedExitTime, plannedExitTime) || other.plannedExitTime == plannedExitTime)&&(identical(other.entryTime, entryTime) || other.entryTime == entryTime)&&(identical(other.exitTime, exitTime) || other.exitTime == exitTime)&&(identical(other.onRoute, onRoute) || other.onRoute == onRoute)&&(identical(other.geometry, geometry) || other.geometry == geometry));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,sequence,eta,etd,plannedTime,plannedExitTime,onRoute,geometry);
+int get hashCode => Object.hash(runtimeType,id,name,sequence,eta,etd,plannedTime,plannedExitTime,entryTime,exitTime,onRoute,geometry);
 
 @override
 String toString() {
-  return 'TripPoint(id: $id, name: $name, sequence: $sequence, eta: $eta, etd: $etd, plannedTime: $plannedTime, plannedExitTime: $plannedExitTime, onRoute: $onRoute, geometry: $geometry)';
+  return 'TripPoint(id: $id, name: $name, sequence: $sequence, eta: $eta, etd: $etd, plannedTime: $plannedTime, plannedExitTime: $plannedExitTime, entryTime: $entryTime, exitTime: $exitTime, onRoute: $onRoute, geometry: $geometry)';
 }
 
 
@@ -592,7 +592,7 @@ abstract mixin class $TripPointCopyWith<$Res>  {
   factory $TripPointCopyWith(TripPoint value, $Res Function(TripPoint) _then) = _$TripPointCopyWithImpl;
 @useResult
 $Res call({
- int id, String name, int sequence, int? eta, int? etd, int? plannedTime, int? plannedExitTime,@JsonKey(name: 'myRoute') bool onRoute, PointGeometry? geometry
+ int id, String name, int sequence, int? eta, int? etd, int? plannedTime, int? plannedExitTime, int? entryTime, int? exitTime,@JsonKey(name: 'myRoute') bool onRoute, PointGeometry? geometry
 });
 
 
@@ -609,7 +609,7 @@ class _$TripPointCopyWithImpl<$Res>
 
 /// Create a copy of TripPoint
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? sequence = null,Object? eta = freezed,Object? etd = freezed,Object? plannedTime = freezed,Object? plannedExitTime = freezed,Object? onRoute = null,Object? geometry = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? sequence = null,Object? eta = freezed,Object? etd = freezed,Object? plannedTime = freezed,Object? plannedExitTime = freezed,Object? entryTime = freezed,Object? exitTime = freezed,Object? onRoute = null,Object? geometry = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -618,6 +618,8 @@ as int,eta: freezed == eta ? _self.eta : eta // ignore: cast_nullable_to_non_nul
 as int?,etd: freezed == etd ? _self.etd : etd // ignore: cast_nullable_to_non_nullable
 as int?,plannedTime: freezed == plannedTime ? _self.plannedTime : plannedTime // ignore: cast_nullable_to_non_nullable
 as int?,plannedExitTime: freezed == plannedExitTime ? _self.plannedExitTime : plannedExitTime // ignore: cast_nullable_to_non_nullable
+as int?,entryTime: freezed == entryTime ? _self.entryTime : entryTime // ignore: cast_nullable_to_non_nullable
+as int?,exitTime: freezed == exitTime ? _self.exitTime : exitTime // ignore: cast_nullable_to_non_nullable
 as int?,onRoute: null == onRoute ? _self.onRoute : onRoute // ignore: cast_nullable_to_non_nullable
 as bool,geometry: freezed == geometry ? _self.geometry : geometry // ignore: cast_nullable_to_non_nullable
 as PointGeometry?,
@@ -717,10 +719,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String name,  int sequence,  int? eta,  int? etd,  int? plannedTime,  int? plannedExitTime, @JsonKey(name: 'myRoute')  bool onRoute,  PointGeometry? geometry)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String name,  int sequence,  int? eta,  int? etd,  int? plannedTime,  int? plannedExitTime,  int? entryTime,  int? exitTime, @JsonKey(name: 'myRoute')  bool onRoute,  PointGeometry? geometry)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TripPoint() when $default != null:
-return $default(_that.id,_that.name,_that.sequence,_that.eta,_that.etd,_that.plannedTime,_that.plannedExitTime,_that.onRoute,_that.geometry);case _:
+return $default(_that.id,_that.name,_that.sequence,_that.eta,_that.etd,_that.plannedTime,_that.plannedExitTime,_that.entryTime,_that.exitTime,_that.onRoute,_that.geometry);case _:
   return orElse();
 
 }
@@ -738,10 +740,10 @@ return $default(_that.id,_that.name,_that.sequence,_that.eta,_that.etd,_that.pla
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String name,  int sequence,  int? eta,  int? etd,  int? plannedTime,  int? plannedExitTime, @JsonKey(name: 'myRoute')  bool onRoute,  PointGeometry? geometry)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String name,  int sequence,  int? eta,  int? etd,  int? plannedTime,  int? plannedExitTime,  int? entryTime,  int? exitTime, @JsonKey(name: 'myRoute')  bool onRoute,  PointGeometry? geometry)  $default,) {final _that = this;
 switch (_that) {
 case _TripPoint():
-return $default(_that.id,_that.name,_that.sequence,_that.eta,_that.etd,_that.plannedTime,_that.plannedExitTime,_that.onRoute,_that.geometry);case _:
+return $default(_that.id,_that.name,_that.sequence,_that.eta,_that.etd,_that.plannedTime,_that.plannedExitTime,_that.entryTime,_that.exitTime,_that.onRoute,_that.geometry);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -758,10 +760,10 @@ return $default(_that.id,_that.name,_that.sequence,_that.eta,_that.etd,_that.pla
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String name,  int sequence,  int? eta,  int? etd,  int? plannedTime,  int? plannedExitTime, @JsonKey(name: 'myRoute')  bool onRoute,  PointGeometry? geometry)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String name,  int sequence,  int? eta,  int? etd,  int? plannedTime,  int? plannedExitTime,  int? entryTime,  int? exitTime, @JsonKey(name: 'myRoute')  bool onRoute,  PointGeometry? geometry)?  $default,) {final _that = this;
 switch (_that) {
 case _TripPoint() when $default != null:
-return $default(_that.id,_that.name,_that.sequence,_that.eta,_that.etd,_that.plannedTime,_that.plannedExitTime,_that.onRoute,_that.geometry);case _:
+return $default(_that.id,_that.name,_that.sequence,_that.eta,_that.etd,_that.plannedTime,_that.plannedExitTime,_that.entryTime,_that.exitTime,_that.onRoute,_that.geometry);case _:
   return null;
 
 }
@@ -773,7 +775,7 @@ return $default(_that.id,_that.name,_that.sequence,_that.eta,_that.etd,_that.pla
 @JsonSerializable()
 
 class _TripPoint extends TripPoint {
-  const _TripPoint({required this.id, required this.name, this.sequence = 0, this.eta, this.etd, this.plannedTime, this.plannedExitTime, @JsonKey(name: 'myRoute') this.onRoute = false, this.geometry}): super._();
+  const _TripPoint({required this.id, required this.name, this.sequence = 0, this.eta, this.etd, this.plannedTime, this.plannedExitTime, this.entryTime, this.exitTime, @JsonKey(name: 'myRoute') this.onRoute = false, this.geometry}): super._();
   factory _TripPoint.fromJson(Map<String, dynamic> json) => _$TripPointFromJson(json);
 
 @override final  int id;
@@ -783,6 +785,8 @@ class _TripPoint extends TripPoint {
 @override final  int? etd;
 @override final  int? plannedTime;
 @override final  int? plannedExitTime;
+@override final  int? entryTime;
+@override final  int? exitTime;
 @override@JsonKey(name: 'myRoute') final  bool onRoute;
 @override final  PointGeometry? geometry;
 
@@ -799,16 +803,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TripPoint&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.sequence, sequence) || other.sequence == sequence)&&(identical(other.eta, eta) || other.eta == eta)&&(identical(other.etd, etd) || other.etd == etd)&&(identical(other.plannedTime, plannedTime) || other.plannedTime == plannedTime)&&(identical(other.plannedExitTime, plannedExitTime) || other.plannedExitTime == plannedExitTime)&&(identical(other.onRoute, onRoute) || other.onRoute == onRoute)&&(identical(other.geometry, geometry) || other.geometry == geometry));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TripPoint&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.sequence, sequence) || other.sequence == sequence)&&(identical(other.eta, eta) || other.eta == eta)&&(identical(other.etd, etd) || other.etd == etd)&&(identical(other.plannedTime, plannedTime) || other.plannedTime == plannedTime)&&(identical(other.plannedExitTime, plannedExitTime) || other.plannedExitTime == plannedExitTime)&&(identical(other.entryTime, entryTime) || other.entryTime == entryTime)&&(identical(other.exitTime, exitTime) || other.exitTime == exitTime)&&(identical(other.onRoute, onRoute) || other.onRoute == onRoute)&&(identical(other.geometry, geometry) || other.geometry == geometry));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,sequence,eta,etd,plannedTime,plannedExitTime,onRoute,geometry);
+int get hashCode => Object.hash(runtimeType,id,name,sequence,eta,etd,plannedTime,plannedExitTime,entryTime,exitTime,onRoute,geometry);
 
 @override
 String toString() {
-  return 'TripPoint(id: $id, name: $name, sequence: $sequence, eta: $eta, etd: $etd, plannedTime: $plannedTime, plannedExitTime: $plannedExitTime, onRoute: $onRoute, geometry: $geometry)';
+  return 'TripPoint(id: $id, name: $name, sequence: $sequence, eta: $eta, etd: $etd, plannedTime: $plannedTime, plannedExitTime: $plannedExitTime, entryTime: $entryTime, exitTime: $exitTime, onRoute: $onRoute, geometry: $geometry)';
 }
 
 
@@ -819,7 +823,7 @@ abstract mixin class _$TripPointCopyWith<$Res> implements $TripPointCopyWith<$Re
   factory _$TripPointCopyWith(_TripPoint value, $Res Function(_TripPoint) _then) = __$TripPointCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String name, int sequence, int? eta, int? etd, int? plannedTime, int? plannedExitTime,@JsonKey(name: 'myRoute') bool onRoute, PointGeometry? geometry
+ int id, String name, int sequence, int? eta, int? etd, int? plannedTime, int? plannedExitTime, int? entryTime, int? exitTime,@JsonKey(name: 'myRoute') bool onRoute, PointGeometry? geometry
 });
 
 
@@ -836,7 +840,7 @@ class __$TripPointCopyWithImpl<$Res>
 
 /// Create a copy of TripPoint
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? sequence = null,Object? eta = freezed,Object? etd = freezed,Object? plannedTime = freezed,Object? plannedExitTime = freezed,Object? onRoute = null,Object? geometry = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? sequence = null,Object? eta = freezed,Object? etd = freezed,Object? plannedTime = freezed,Object? plannedExitTime = freezed,Object? entryTime = freezed,Object? exitTime = freezed,Object? onRoute = null,Object? geometry = freezed,}) {
   return _then(_TripPoint(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -845,6 +849,8 @@ as int,eta: freezed == eta ? _self.eta : eta // ignore: cast_nullable_to_non_nul
 as int?,etd: freezed == etd ? _self.etd : etd // ignore: cast_nullable_to_non_nullable
 as int?,plannedTime: freezed == plannedTime ? _self.plannedTime : plannedTime // ignore: cast_nullable_to_non_nullable
 as int?,plannedExitTime: freezed == plannedExitTime ? _self.plannedExitTime : plannedExitTime // ignore: cast_nullable_to_non_nullable
+as int?,entryTime: freezed == entryTime ? _self.entryTime : entryTime // ignore: cast_nullable_to_non_nullable
+as int?,exitTime: freezed == exitTime ? _self.exitTime : exitTime // ignore: cast_nullable_to_non_nullable
 as int?,onRoute: null == onRoute ? _self.onRoute : onRoute // ignore: cast_nullable_to_non_nullable
 as bool,geometry: freezed == geometry ? _self.geometry : geometry // ignore: cast_nullable_to_non_nullable
 as PointGeometry?,

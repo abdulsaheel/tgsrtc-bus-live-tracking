@@ -39,6 +39,8 @@ _TripPoint _$TripPointFromJson(Map<String, dynamic> json) => _TripPoint(
   etd: (json['etd'] as num?)?.toInt(),
   plannedTime: (json['plannedTime'] as num?)?.toInt(),
   plannedExitTime: (json['plannedExitTime'] as num?)?.toInt(),
+  entryTime: (json['entryTime'] as num?)?.toInt(),
+  exitTime: (json['exitTime'] as num?)?.toInt(),
   onRoute: json['myRoute'] as bool? ?? false,
   geometry: json['geometry'] == null
       ? null
@@ -54,6 +56,8 @@ Map<String, dynamic> _$TripPointToJson(_TripPoint instance) =>
       'etd': instance.etd,
       'plannedTime': instance.plannedTime,
       'plannedExitTime': instance.plannedExitTime,
+      'entryTime': instance.entryTime,
+      'exitTime': instance.exitTime,
       'myRoute': instance.onRoute,
       'geometry': instance.geometry,
     };

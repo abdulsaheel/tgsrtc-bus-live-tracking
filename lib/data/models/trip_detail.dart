@@ -49,12 +49,17 @@ abstract class TripPoint with _$TripPoint {
     int? etd,
     int? plannedTime,
     int? plannedExitTime,
+    int? entryTime,
+    int? exitTime,
     @JsonKey(name: 'myRoute') @Default(false) bool onRoute,
     PointGeometry? geometry,
   }) = _TripPoint;
 
   factory TripPoint.fromJson(Map<String, dynamic> json) =>
       _$TripPointFromJson(json);
+
+  /// Scheduled arrival (epoch s) / actual recorded arrival, if passed.
+  bool get isPassed => (entryTime ?? 0) > 0;
 
   double? get latitude =>
       geometry != null && geometry!.coordinates.length >= 2

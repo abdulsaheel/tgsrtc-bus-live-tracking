@@ -1,49 +1,44 @@
 import 'package:go_router/go_router.dart';
 
+import '../../features/home/presentation/home_screen.dart';
 import '../../features/journey/presentation/journey_screen.dart';
 import '../../features/nearby/presentation/nearby_screen.dart';
+import '../../features/track/presentation/airport_screen.dart';
+import '../../features/track/presentation/bus_search_screen.dart';
+import '../../features/track/presentation/city_screen.dart';
 import '../../features/track/presentation/live_map_screen.dart';
-import '../../features/track/presentation/track_screen.dart';
-import '../widgets/app_shell.dart';
+import '../../data/models/service_category.dart';
 
-/// go_router config. Named routes per ui-ux-pro-max Flutter guidance.
+/// Home-grid navigation: a landing [HomeScreen] pushes into dedicated, purpose-
+/// built screens (City / District / Airport / Near me / Plan). The live map is
+/// a full-screen push; the active-journey PiP floats globally (mounted in the
+/// MaterialApp builder).
 final appRouter = GoRouter(
-  initialLocation: '/track',
+  initialLocation: '/',
   routes: [
-    StatefulShellRoute.indexedStack(
-      builder: (context, state, shell) => AppShell(shell: shell),
-      branches: [
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/track',
-            name: 'track',
-            builder: (_, _) => const TrackScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/nearby',
-            name: 'nearby',
-            builder: (_, _) => const NearbyScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/plan',
-            name: 'plan',
-            builder: (_, _) => const JourneyScreen(),
-          ),
-        ]),
-      ],
-    ),
-    // Journey planner (full-screen push).
+    GoRoute(path: '/', name: 'home', builder: (_, _) => const HomeScreen()),
+    GoRoute(path: '/city', name: 'city', builder: (_, _) => const CityScreen()),
+    GoRoute(
+        path: '/district',
+        name: 'district',
+        builder: (_, _) => const BusSearchScreen(
+              category: ServiceCategory.district,
+              title: 'District Buses',
+            )),
+    GoRoute(
+        path: '/airport',
+        name: 'airport',
+        builder: (_, _) => const AirportScreen()),
+    GoRoute(
+        path: '/nearby', name: 'nearby', builder: (_, _) => const NearbyScreen()),
+    GoRoute(
+        path: '/plan', name: 'plan', builder: (_, _) => const JourneyScreen()),
     GoRoute(
       path: '/journey',
       name: 'journey',
       builder: (context, state) =>
           JourneyScreen(fromSeed: state.uri.queryParameters['from']),
     ),
-    // Live map is a full-screen push (outside the shell).
     GoRoute(
       path: '/live/:vehicleId',
       name: 'live',

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/widgets/about_dialog.dart';
 import '../../../core/widgets/async_view.dart';
 import '../../../data/models/bus_service.dart';
 import '../../../data/models/city.dart';
@@ -10,44 +9,50 @@ import '../providers/track_providers.dart';
 import 'city_picker.dart';
 import 'route_buses_sheet.dart';
 
-/// Home: shows routes for the detected/selected city + category, with search.
-class TrackScreen extends ConsumerStatefulWidget {
-  const TrackScreen({super.key});
+/// Browse + search routes for one [category] (City or Airport) in the selected
+/// city. Sets the global category on entry so the route-buses sheet resolves
+/// the right operationType. Used by the dedicated City and Airport screens.
+class RouteBrowserScreen extends ConsumerStatefulWidget {
+  const RouteBrowserScreen({
+    super.key,
+    required this.category,
+    required this.title,
+    required this.searchHint,
+  });
+
+  final ServiceCategory category;
+  final String title;
+  final String searchHint;
 
   @override
-  ConsumerState<TrackScreen> createState() => _TrackScreenState();
+  ConsumerState<RouteBrowserScreen> createState() => _RouteBrowserScreenState();
 }
 
-class _TrackScreenState extends ConsumerState<TrackScreen> {
+class _RouteBrowserScreenState extends ConsumerState<RouteBrowserScreen> {
   String _filter = '';
 
   @override
+  void initState() {
+    super.initState();
+    // The route list + buses sheet read the global category.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(selectedCategoryProvider.notifier).state = widget.category;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Kick off one-time city resolution (persisted → detect → prompt).
     final init = ref.watch(cityInitProvider);
     final selected = ref.watch(selectedCityProvider);
     final detecting = ref.watch(cityDetectingProvider);
-    final category = ref.watch(selectedCategoryProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Track a bus'),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'About',
-            onPressed: () => showGamyamAbout(context),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(widget.title)),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _CityHeader(city: selected, detecting: detecting),
-            // Resolve flow: while detecting/loading show spinner; if no city
-            // resolved, prompt to choose.
             if (selected == null)
               Expanded(
                 child: init.isLoading || detecting
@@ -56,43 +61,17 @@ class _TrackScreenState extends ConsumerState<TrackScreen> {
               )
             else ...[
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: SegmentedButton<ServiceCategory>(
-                  segments: const [
-                    ButtonSegment(
-                      value: ServiceCategory.city,
-                      label: Text('City'),
-                      icon: Icon(Icons.location_city_outlined),
-                    ),
-                    ButtonSegment(
-                      value: ServiceCategory.district,
-                      label: Text('District'),
-                      icon: Icon(Icons.map_outlined),
-                    ),
-                    ButtonSegment(
-                      value: ServiceCategory.airport,
-                      label: Text('Airport'),
-                      icon: Icon(Icons.flight_outlined),
-                    ),
-                  ],
-                  selected: {category},
-                  onSelectionChanged: (s) => ref
-                      .read(selectedCategoryProvider.notifier)
-                      .state = s.first,
-                ),
-              ),
-              Padding(
                 padding: const EdgeInsets.all(16),
                 child: TextField(
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Search route or service',
-                    hintText: 'e.g. 10H, 230A, METRO',
-                    prefixIcon: Icon(Icons.search),
+                    hintText: widget.searchHint,
+                    prefixIcon: const Icon(Icons.search),
                   ),
                   onChanged: (v) => setState(() => _filter = v.toLowerCase()),
                 ),
               ),
-              Expanded(child: _RouteList(filter: _filter)),
+              Expanded(child: _RouteList(category: widget.category, filter: _filter)),
             ],
           ],
         ),
@@ -143,7 +122,8 @@ class _CityHeader extends ConsumerWidget {
 }
 
 class _RouteList extends ConsumerWidget {
-  const _RouteList({required this.filter});
+  const _RouteList({required this.category, required this.filter});
+  final ServiceCategory category;
   final String filter;
 
   @override
@@ -201,11 +181,10 @@ class _NoRoutesHint extends StatelessWidget {
             Icon(Icons.directions_bus_filled_outlined,
                 size: 48, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 12),
-            Text('No routes in this category', style: t.titleMedium),
+            Text('No routes here', style: t.titleMedium),
             const SizedBox(height: 4),
             Text(
-              'This city may not run services in this category. '
-              'Try City / District / Airport above.',
+              'This city may not run services in this category.',
               style: t.bodyMedium,
               textAlign: TextAlign.center,
             ),

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/notifications/live_activity_service.dart';
 import 'core/prefs/app_prefs.dart';
+import 'features/track/presentation/journey_live_activity.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
@@ -64,12 +65,19 @@ class GamyamApp extends StatelessWidget {
     // Wrap so the foreground task can drive UI updates reliably.
     return WithForegroundTask(
       child: MaterialApp.router(
-        title: 'Gamyam',
+        title: 'TGSRTC Bus Live Tracking',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: ThemeMode.system,
         routerConfig: appRouter,
+        // Float the active-journey PiP above every screen.
+        builder: (context, child) => Stack(
+          children: [
+            ?child,
+            const JourneyLiveActivity(),
+          ],
+        ),
       ),
     );
   }

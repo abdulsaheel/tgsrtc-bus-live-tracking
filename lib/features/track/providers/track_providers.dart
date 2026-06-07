@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/prefs/app_prefs.dart';
@@ -7,8 +8,11 @@ import '../../../data/models/bus_service.dart';
 import '../../../data/models/bus_trip.dart';
 import '../../../data/models/city.dart';
 import '../../../data/models/live_data.dart';
+import '../../../data/models/planned_trip.dart';
 import '../../../data/models/service_category.dart';
+import '../../../data/models/stop.dart';
 import '../../../data/models/trip_detail.dart';
+import '../../../data/models/vehicle.dart';
 import '../../../data/repositories/location_service.dart';
 import '../../../data/repositories/transit_repository.dart';
 import 'journey_controller.dart';
@@ -133,6 +137,138 @@ final sharedLiveProvider =
     return AsyncData(j.live!);
   }
   return ref.watch(liveVehicleProvider(vehicleId));
+});
+
+/// Stops for the District from→to picker: ALL op=1 stops (both `place`
+/// destinations like "X (ALL)" AND `stage` stops like "MIYAPUR X Road") for the
+/// selected city — matching the official app's getAllStops(op=1, cityId). Each
+/// stop carries its own geozoneType, used verbatim in the search. Falls back to
+/// Hyderabad (richest network) when no city is selected.
+final districtStopsProvider = FutureProvider.autoDispose<List<Stop>>((ref) async {
+  final api = ref.watch(transitRepositoryProvider).api;
+  // Official app: getAllStops(operationType=1, cityId="") — statewide.
+  var stops = await api.stops(cityId: '', operationType: 1, isAirport: false);
+  if (stops.isEmpty) {
+    // Defensive fallback: a hub city's op=1 list still carries the global
+    // "place" destinations if the empty-cityId call ever returns nothing.
+    final cities = await ref.watch(citiesProvider.future);
+    final hub = cities.firstWhere(
+      (c) => c.name.toUpperCase().contains('HYDERABAD'),
+      orElse: () => cities.first,
+    );
+    stops = await api.stops(cityId: hub.id, operationType: 1, isAirport: false);
+  }
+  // Places (intercity destinations) first, then stages; alpha within each.
+  stops.sort((a, b) {
+    final pa = (a.geozoneType ?? '') == 'place' ? 0 : 1;
+    final pb = (b.geozoneType ?? '') == 'place' ? 0 : 1;
+    return pa != pb ? pa - pb : a.name.compareTo(b.name);
+  });
+  return stops;
+});
+
+/// City stage stops (for the City "between stops" picker) in the selected city.
+final cityStageStopsProvider = FutureProvider.autoDispose<List<Stop>>((ref) async {
+  final city = ref.watch(selectedCityProvider);
+  if (city == null) return const [];
+  final cat = ref.watch(selectedCategoryProvider);
+  final stops = await ref
+      .watch(transitRepositoryProvider)
+      .api
+      .stops(cityId: city.id, operationType: cat.operationType, isAirport: cat.isAirport);
+  return stops.where((s) => (s.geozoneType ?? 'stage') == 'stage').toList()
+    ..sort((a, b) => a.name.compareTo(b.name));
+});
+
+/// The user's last-known location (lat, lng) as strings — passed to the
+/// between search exactly like the official app (MyLocLat / MyLocLng). Fast,
+/// non-blocking; null if unavailable.
+final userLatLngProvider =
+    FutureProvider.autoDispose<(String, String)?>((ref) async {
+  try {
+    final pos = await Geolocator.getLastKnownPosition();
+    if (pos == null) return null;
+    return (pos.latitude.toString(), pos.longitude.toString());
+  } catch (_) {
+    return null;
+  }
+});
+
+/// from→to buses running RIGHT NOW — the EXACT official call (v3
+/// getnewBusesList: cityId + user lat/lng + each stop's geozoneType).
+/// Key = (fromId, toId, fromGeozone, toGeozone, op).
+final betweenLiveProvider = FutureProvider.autoDispose
+    .family<List<BusTrip>, (String, String, String, String, int)>((ref, k) async {
+  final loc = await ref.watch(userLatLngProvider.future);
+  // EXACTLY like the official app: District (op=1) sends cityId="" (statewide);
+  // City (op=2) sends the selected city's id.
+  final cityId = k.$5 == 1 ? '' : (ref.watch(selectedCityProvider)?.id ?? '');
+  final resp = await ref.watch(transitRepositoryProvider).api.searchBetween(
+        fromId: k.$1,
+        toId: k.$2,
+        fromGeozoneType: k.$3,
+        toGeozoneType: k.$4,
+        operationType: k.$5,
+        cityId: cityId,
+        latitude: loc?.$1,
+        longitude: loc?.$2,
+        serviceType: '',
+      );
+  return resp.trips;
+});
+
+/// from→to SCHEDULED timetable — official getnewPlannedtripList: cityId per
+/// category, NO startTime/endTime (the app passes null). Loaded on demand.
+final betweenPlannedProvider = FutureProvider.autoDispose
+    .family<List<PlannedTrip>, (String, String, String, String, int)>((ref, k) {
+  final cityId = k.$5 == 1 ? '' : (ref.watch(selectedCityProvider)?.id ?? '');
+  return ref.watch(transitRepositoryProvider).api.plannedBetween(
+        fromId: k.$1,
+        toId: k.$2,
+        fromGeozoneType: k.$3,
+        toGeozoneType: k.$4,
+        operationType: k.$5,
+        cityId: cityId,
+        serviceType: '',
+      );
+});
+
+/// All bus (vehicle) numbers for the selected city + category — "by bus number".
+final busNumbersProvider = FutureProvider.autoDispose<List<Vehicle>>((ref) async {
+  final city = ref.watch(selectedCityProvider);
+  if (city == null) return const [];
+  final cat = ref.watch(selectedCategoryProvider);
+  return ref
+      .watch(transitRepositoryProvider)
+      .api
+      .busNumbers(cityId: city.id, operationType: cat.operationType, isAirport: cat.isAirport);
+});
+
+/// Trips of a service (by serviceId) — after picking a service/reservation no.
+final tripsByServiceProvider =
+    FutureProvider.autoDispose.family<List<BusTrip>, int>((ref, serviceId) {
+  final cat = ref.watch(selectedCategoryProvider);
+  return ref.watch(transitRepositoryProvider).api.tripsByServiceId(serviceId,
+      operationType: cat.operationType,
+      routeType: cat.operationType == 1 ? '1' : '2');
+});
+
+/// Per-stop punctuality (last recorded run's actual arrival time) for a
+/// service, keyed by (serviceId, anyPointId, operationType). Returns a map of
+/// pointId → actual entryTime (epoch s). Empty/absent when the service has no
+/// history — callers must handle that gracefully (just don't show a time).
+final punctualityProvider = FutureProvider.autoDispose
+    .family<Map<int, int>, (int, int, int)>((ref, k) async {
+  try {
+    final resp = await ref.watch(transitRepositoryProvider).api.punctuality(
+        k.$1, pointId: k.$2, operationType: k.$3);
+    return {
+      for (final p in resp.points)
+        if ((p.entryTime ?? 0) > 0) p.id: p.entryTime!,
+    };
+  } catch (_) {
+    return const {};
+  }
 });
 
 /// Full trip detail (stops + road polyline) for drawing the route on the map.
